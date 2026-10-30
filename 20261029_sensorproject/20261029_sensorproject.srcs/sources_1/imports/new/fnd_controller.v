@@ -16,6 +16,14 @@ module fnd_controller #(
     input  [1:0] setting_state,
     input        setting,          // switch
     input  [3:0] mode,
+    output [3:0] w_msec_ds1,
+    output [3:0] w_msec_ds10,
+    output [3:0] w_sec_ds1,
+    output [3:0] w_sec_ds10,
+    output [3:0] w_min_ds1,
+    output [3:0] w_min_ds10,
+    output [3:0] w_hour_ds1,
+    output [3:0] w_hour_ds10,
     output [3:0] fnd_com,
     output [7:0] fnd_font
 );
@@ -25,10 +33,7 @@ module fnd_controller #(
     wire w_clk_800hz;
     //msec,sec,min,hour
     wire [3:0] w_mux_out, w_msec_sec_mux_out, w_min_hour_mux_out;
-    wire [3:0] w_msec_ds1, w_msec_ds10;
-    wire [3:0] w_sec_ds1, w_sec_ds10;
-    wire [3:0] w_min_ds1, w_min_ds10;
-    wire [3:0] w_hour_ds1, w_hour_ds10;
+    
     wire w_dot_onoff;
 
     wire [3:0] o_msec_ds1;
@@ -43,10 +48,10 @@ module fnd_controller #(
 
     // fnd_controller 안 (sec, hour 쪽 splitter 대신)
     wire raw = (mode == 4'b0010) | (mode == 4'b0001);
-    assign w_sec_ds1  = raw ? sec[3:0]  : sec % 10;
-    assign w_sec_ds10 = raw ? sec[7:4]  : (sec / 10) % 10;
-    assign w_hour_ds1  = raw ? hour[3:0]  : hour % 10;
-    assign w_hour_ds10 = raw ? hour[7:4]  : (hour / 10) % 10;
+    assign w_sec_ds1   = raw ? sec[3:0] : sec % 10;
+    assign w_sec_ds10  = raw ? sec[7:4] : (sec / 10) % 10;
+    assign w_hour_ds1  = raw ? hour[3:0] : hour % 10;
+    assign w_hour_ds10 = raw ? hour[7:4] : (hour / 10) % 10;
 
     clk_div_800hz U_CLK_DIV_800HZ (
         .clk(clk),

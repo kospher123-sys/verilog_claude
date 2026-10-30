@@ -58,6 +58,15 @@ module TOP_4MODULE (
     wire [7:0] w_min;
     wire [7:0] w_hour;
 
+    wire [3:0] w_msec_ds1;
+    wire [3:0] w_msec_ds10;
+    wire [3:0] w_sec_ds1;
+    wire [3:0] w_sec_ds10;
+    wire [3:0] w_min_ds1;
+    wire [3:0] w_min_ds10;
+    wire [3:0] w_hour_ds1;
+    wire [3:0] w_hour_ds10;
+
 
     btn_debouce_block U_BTN_DEBOUNCE_BLOCK (
         .clk (clk),
@@ -76,6 +85,7 @@ module TOP_4MODULE (
     );
 
     wire baud_tick;
+
     baud_tick_gen_datastate U_BAUDTICK_GEN (
         .clk(clk),
         .rst(rst),
@@ -88,15 +98,14 @@ module TOP_4MODULE (
         .rx(rx),
         .b_tick(baud_tick),
 
-        .btnR (w_asciiR),
-        .btnL (w_asciiL),
-        .btnU (w_asciiU),
-        .btnD (w_asciiD),
+        .btnR(w_asciiR),
+        .btnL(w_asciiL),
+        .btnU(w_asciiU),
+        .btnD(w_asciiD),
         .mode1(w_ascii_mode1),
         .mode2(w_ascii_mode2),
         .mode3(w_ascii_mode3),
-        .mode4(w_ascii_mode4),
-        .tx(tx)
+        .mode4(w_ascii_mode4)
     );
 
 
@@ -187,7 +196,7 @@ module TOP_4MODULE (
         .dht11_start(w_R & w_mode4),
         .us_tick(w_b_tick),
         .enable(w_enable_dht11),
-        .valid(), //valid 어따씀;;
+        .valid(),  //valid 어따씀;;
         .humidity(w_humidity),
         .temperature(w_temperature),
         .dht11_io(dht11_io)
@@ -229,8 +238,35 @@ module TOP_4MODULE (
         .setting_state(w_setting_state),
         .setting(sw_setting),
         .mode({w_mode1, w_mode2, w_mode3, w_mode4}),
+        .w_msec_ds1(w_msec_ds1),
+        .w_msec_ds10(w_msec_ds10),
+        .w_sec_ds1(w_sec_ds1),
+        .w_sec_ds10(w_sec_ds10),
+        .w_min_ds1(w_min_ds1),
+        .w_min_ds10(w_min_ds10),
+        .w_hour_ds1(w_hour_ds1),
+        .w_hour_ds10(w_hour_ds10),
         .fnd_com(fnd_com),
         .fnd_font(fnd_font)
+    );
+
+
+
+
+
+    tx_sender U_TX_SENDER (
+        .clk(clk),
+        .rst(rst),
+        .baud_tick(baud_tick),
+        .w_msec_ds1(w_msec_ds1),
+        .w_msec_ds10(w_msec_ds10),
+        .w_sec_ds1(w_sec_ds1),
+        .w_sec_ds10(w_sec_ds10),
+        .w_min_ds1(w_min_ds1),
+        .w_min_ds10(w_min_ds10),
+        .w_hour_ds1(w_hour_ds1),
+        .w_hour_ds10(w_hour_ds10),
+        .tx(tx)
     );
 
 
