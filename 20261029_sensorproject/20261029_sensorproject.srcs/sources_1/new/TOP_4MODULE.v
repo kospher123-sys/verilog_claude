@@ -49,6 +49,7 @@ module TOP_4MODULE (
 
     wire [1:0] w_setting_state;
     wire w_b_tick;
+    wire baud_tick;
 
     wire [8:0] w_distance;
     wire [7:0] w_humidity, w_temperature;
@@ -76,7 +77,6 @@ module TOP_4MODULE (
         .btnU(btnU),
         .btnD(btnD),
 
-
         .btnR_tick(w_btn_R),
         .btnL_tick(w_btn_L),
         .btnU_tick(w_btn_U),
@@ -84,7 +84,6 @@ module TOP_4MODULE (
 
     );
 
-    wire baud_tick;
 
     baud_tick_gen_datastate U_BAUDTICK_GEN (
         .clk(clk),
