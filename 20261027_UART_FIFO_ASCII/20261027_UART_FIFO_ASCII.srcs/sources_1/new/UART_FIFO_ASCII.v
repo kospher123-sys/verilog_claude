@@ -53,56 +53,7 @@ module UART_FIFO_ASCII (
 
 endmodule
 
-module ascii_sender (
-    input clk,
-    input rst,
-    input status,
-    input [23:0] in_data,  //{hour, min, sec, msec} - value not a bit
-    input b_tick,
-    output reg push,
-    output reg [7:0] out_data
-);
 
-    localparam IDLE = 1'b0, SEND = 1'b1;
-    reg c_state, n_state;
-    reg [6:0] data0 = in_data[6:0];  //msec ~99
-    reg [5:0] data1 = in_data[12:7];  //sec ~59
-    reg [5:0] data2 = in_data[18:13];  //min ~59
-    reg [4:0] data3 = in_data[23:19];  //hour ~23
-
-    always @(posedge clk, posedge rst) begin
-        if (rst) begin
-            c_state <= IDLE;
-        end else begin
-            c_state <= n_state;
-        end
-    end
-
-    always @(*) begin
-        n_state = c_state;
-        push = 0;
-        out_data = 0;
-        if (b_tick) begin
-            case (c_state)
-                SEND: begin
-                        
-                        out_data = ;
-                        push = 1;
-                    end
-                IDLE: begin
-                    if (status) n_state = SEND;
-                end
-            endcase
-        end
-    end
-
-endmodule
-
-module mux_4x1(
-    
-);
-// 먹스로 데이터 4개중 1나 순서대로 출력하기
-endmodule
 
 module baud_tick_gen_framecount (
     input clk,

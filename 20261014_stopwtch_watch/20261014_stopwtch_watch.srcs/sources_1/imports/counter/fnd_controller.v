@@ -6,18 +6,18 @@ module fnd_controller #(
     parameter MIN_BIT_WIDTH  = 6,
     parameter HOUR_BIT_WIDTH = 5
 ) (
-    input                       clk,
-    input                       rst,
-    input                       sw_dsiplay_mode,
-    input  [MSEC_BIT_WIDTH-1:0] msec,
-    input  [ SEC_BIT_WIDTH-1:0] sec,
-    input  [ MIN_BIT_WIDTH-1:0] min,
-    input  [HOUR_BIT_WIDTH-1:0] hour,
-    input  [               1:0] setting_state,
-    input                       setting,
-    input                       sw_clock_mode,
-    output [               3:0] fnd_com,
-    output [               7:0] fnd_font
+    input        clk,
+    input        rst,
+    input        sw_dsiplay_mode,
+    input  [7:0] msec,
+    input  [7:0] sec,
+    input  [7:0] min,
+    input  [7:0] hour,
+    input  [1:0] setting_state,
+    input        setting,
+    input        sw_clock_mode,
+    output [3:0] fnd_com,
+    output [7:0] fnd_font
 );
 
 
@@ -50,36 +50,28 @@ module fnd_controller #(
 
 
     // msec ds
-    digit_splitter #(
-        .BIT_WIDTH(MSEC_BIT_WIDTH)
-    ) U_MSEC_DIRIT_SPLITTER (
+    digit_splitter_fnd U_MSEC_DIRIT_SPLITTER (
         .dsin(msec),
         .ds1 (w_msec_ds1),
         .ds10(w_msec_ds10)
     );
 
     //sec ds
-    digit_splitter #(
-        .BIT_WIDTH(SEC_BIT_WIDTH)
-    ) U_SEC_DIRIT_SPLITTER (
+    digit_splitter_fnd U_SEC_DIRIT_SPLITTER (
         .dsin(sec),
         .ds1 (w_sec_ds1),
         .ds10(w_sec_ds10)
     );
 
     //min ds
-    digit_splitter #(
-        .BIT_WIDTH(MIN_BIT_WIDTH)
-    ) U_MIN_DIRIT_SPLITTER (
+    digit_splitter_fnd U_MIN_DIRIT_SPLITTER (
         .dsin(min),
         .ds1 (w_min_ds1),
         .ds10(w_min_ds10)
     );
 
     //hour ds
-    digit_splitter #(
-        .BIT_WIDTH(HOUR_BIT_WIDTH)
-    ) U_HOUR_DIRIT_SPLITTER (
+    digit_splitter_fnd U_HOUR_DIRIT_SPLITTER (
         .dsin(hour),
         .ds1 (w_hour_ds1),
         .ds10(w_hour_ds10)
@@ -423,13 +415,10 @@ module decoder_2x4 (
 endmodule
 
 
-module digit_splitter #(
-    parameter BIT_WIDTH = 7
-) (
-    input  [BIT_WIDTH-1:0] dsin,
+module digit_splitter_fnd(
+    input  [7:0] dsin,
     output [          3:0] ds1,
     output [          3:0] ds10
-
 );
 
     assign ds1  = dsin % 10;
