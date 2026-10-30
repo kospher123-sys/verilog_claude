@@ -187,7 +187,7 @@ module TOP_4MODULE (
         .dht11_start(w_R & w_mode4),
         .us_tick(w_b_tick),
         .enable(w_enable_dht11),
-        .valid(), //vlaid 어따씀;;
+        .valid(), //valid 어따씀;;
         .humidity(w_humidity),
         .temperature(w_temperature),
         .dht11_io(dht11_io)

@@ -86,28 +86,28 @@ module uart_rx (
 endmodule
 
 
-module baud_tick_gen_datastate (
-    input clk,
-    input rst,
-    output reg b_tick
-);
+// module baud_tick_gen_datastate (
+//     input clk,
+//     input rst,
+//     output reg b_tick
+// );
 
-    //100Mhz -> 9600hz
-    parameter F_COUNT = (100_000_000 / 9600 * 16);
-    reg [$clog2(F_COUNT)-1:0] counter_reg;
+//     //100Mhz -> 9600hz
+//     parameter F_COUNT = (100_000_000 / 9600 * 16);
+//     reg [$clog2(F_COUNT)-1:0] counter_reg;
 
-    always @(posedge clk, posedge rst) begin
-        if (rst) begin
-            counter_reg <= 0;
-            b_tick      <= 0;
-        end else begin
-            counter_reg <= counter_reg + 1;
-            b_tick <= 0;
-            if (counter_reg == F_COUNT - 1) begin
-                counter_reg <= 0;
-                b_tick <= 1;
-            end
-        end
-    end
+//     always @(posedge clk, posedge rst) begin
+//         if (rst) begin
+//             counter_reg <= 0;
+//             b_tick      <= 0;
+//         end else begin
+//             counter_reg <= counter_reg + 1;
+//             b_tick <= 0;
+//             if (counter_reg == F_COUNT - 1) begin
+//                 counter_reg <= 0;
+//                 b_tick <= 1;
+//             end
+//         end
+//     end
 
-endmodule
+// endmodule

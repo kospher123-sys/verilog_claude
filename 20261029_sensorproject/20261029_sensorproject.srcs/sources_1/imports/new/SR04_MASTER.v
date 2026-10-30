@@ -57,6 +57,15 @@ module controll_unit_sr04 (
     assign trig = trig_reg;
     assign distance = centi_reg;
 
+    wire b58_tick;
+
+    tick_gen_58us_sr04 U_TICK_GEN_58US_SR04(
+    .clk(clk),
+    .rst(rst),
+    .enable(enable),
+    .b_tick(b58_tick)
+);
+
     always @(posedge clk, posedge rst) begin
         if (rst) begin
             c_state <= IDLE;
@@ -111,7 +120,7 @@ module controll_unit_sr04 (
                     b_tick_cnt_next = 0;
                 end else begin
                     if (b_tick) begin
-                        if(b_tick_cnt >= 1_000 - 1)begin
+                        if(b_tick_cnt >= 30_000 - 1)begin
                         n_state = IDLE;
                         b_tick_cnt_next = 0;
                         end else b_tick_cnt_next = b_tick_cnt + 1;
@@ -120,14 +129,14 @@ module controll_unit_sr04 (
             end
             DISTANCE: begin
                 enable = 1;
-                if (b_tick) begin
+                if (b58_tick) begin
                     b_tick_cnt_next = b_tick_cnt + 1;
                     if (!echo) begin
-                        centi_next = b_tick_cnt_next / 58;
+                        centi_next = b_tick_cnt_next;
                         b_tick_cnt_next = 0;
                         n_state = STOP;
                     end else begin
-                        if (b_tick_cnt >= 36_000 - 1) begin
+                        if (b_tick_cnt >= 400 - 1) begin
                             centi_next = 400;
                             b_tick_cnt_next = 0;
                             n_state = STOP;
@@ -156,6 +165,37 @@ module tick_gen_us_sr04 (
     output reg b_tick
 );
     parameter F_COUNT = 100;
+    reg [$clog2(F_COUNT)-1:0] count_reg;
+
+    always @(posedge clk, posedge rst) begin
+        if (rst) begin
+            count_reg <= 0;
+            b_tick <= 0;
+        end else begin
+            if (enable) begin
+                if (count_reg == F_COUNT - 2) begin
+                    count_reg <= 0;
+                    b_tick <= 1;
+                end else begin
+                    count_reg <= count_reg + 1;
+                    b_tick <= 0;
+                end
+            end else begin
+                b_tick <= 0;
+                count_reg <= 0;
+            end
+        end
+    end
+
+endmodule
+
+module tick_gen_58us_sr04 (
+    input clk,
+    input rst,
+    input enable,
+    output reg b_tick
+);
+    parameter F_COUNT = 5800;
     reg [$clog2(F_COUNT)-1:0] count_reg;
 
     always @(posedge clk, posedge rst) begin
