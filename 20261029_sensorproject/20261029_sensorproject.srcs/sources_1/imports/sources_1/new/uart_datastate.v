@@ -58,6 +58,7 @@ module uart_tx_datastate (
                     b_tick_cnt_next = 0;
                     data_next = tx_data;
                     n_state   = START;
+                    tx_busy_next = 1'b1;
                 end
             end
             START: begin
@@ -89,8 +90,12 @@ module uart_tx_datastate (
                 tx_next = 1;
                 // bit_count_next = 0;
                 if (b_tick == 1) begin
-                    if (b_tick_cnt == 15) n_state = IDLE;
+                    if (b_tick_cnt == 15) begin
+                        n_state = IDLE;
+                        tx_busy_next = 1'b0;
+                    end
                     else b_tick_cnt_next = b_tick_cnt + 1;
+                    
                 end
             end
         endcase

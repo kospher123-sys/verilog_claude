@@ -13,13 +13,14 @@ module RX_ASCII_DECORDER(
     output mode1,
     output mode2,
     output mode3,
-    output mode4
+    output mode4,
+    output tx
     );
 
     parameter DEPTH = 4, A_BIT_WIDTH = $clog2(DEPTH), D_BIT_WIDTH = 8;
     wire  w_rx_done, w_rx_pop;
-    wire       w_rx_empty;
-    wire [7:0] w_rx_data, w_rx_pop_data;
+    wire       w_rx_empty,tx_busy,w_tx_empty;
+    wire [7:0] w_rx_data, w_rx_pop_data,w_tx_pop_data;
 
     uart_rx U_UART_RX (
         .clk    (clk),
@@ -62,6 +63,30 @@ module RX_ASCII_DECORDER(
         .mode4(mode4)
     );
 
+
+    fifo #(
+        .DEPTH(DEPTH),
+        .D_BIT_WIDTH(D_BIT_WIDTH)
+    ) U_FIFO_TX (
+        .clk(clk),
+        .rst(rst),
+        .push(~w_rx_empty),
+        .pop(~tx_busy),
+        .push_data(w_rx_pop_data),
+        .pop_data(w_tx_pop_data),
+        .full(),
+        .empty(w_tx_empty)
+    );
+
+    uart_tx_datastate U_UART_TX (
+        .clk  (clk),
+        .rst   (rst),
+        .tx_start(~w_tx_empty),
+        .tx_data(w_tx_pop_data),
+        .b_tick  (b_tick),
+        .tx  (tx),
+        .tx_busy (tx_busy)
+    );
 
 
 

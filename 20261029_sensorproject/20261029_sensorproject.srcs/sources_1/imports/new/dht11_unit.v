@@ -24,9 +24,9 @@ module dht11_controller (
     wire [7:0] check_sum;
     wire [7:0] check_sum_debug;
 
-    assign check_sum_debug = humidity[7:0] + humidity[15:8] +temperature[7:0] + temperature[15:8];
-    assign humidity = data_reg[39:24];
-    assign temperature = data_reg[23:8];
+    assign check_sum_debug = data_reg[39:32] + data_reg[31:24] + data_reg[23:16] + data_reg[15:8];
+    assign humidity = data_reg[39:32];
+    assign temperature = data_reg[23:16];
     assign check_sum = data_reg[7:0];
     assign valid = valid_reg;
     assign dht11_io = (dht11_io_control_reg) ? dht11_io_reg : 1'bz;
@@ -88,7 +88,7 @@ module dht11_controller (
                 dht11_io_control_next = 1'b1;
                 enable = 1;
                 if (us_tick) begin
-                    if (tick_cnt_reg == 30 - 1) begin
+                    if (tick_cnt_reg == 20 - 1) begin
                         // change output to high impedence
                         dht11_io_control_next = 1'b0;
                         tick_cnt_next = 0;
@@ -102,7 +102,7 @@ module dht11_controller (
                 dht11_io_control_next = 1'b0;
                 enable = 1;
                 if (us_tick) begin
-                    if (tick_cnt_reg >= 90) begin
+                    if (tick_cnt_reg >= 120) begin
                         dht11_io_control_next = 1'b1;
                         tick_cnt_next = 0;
                         n_state = IDLE;
@@ -119,7 +119,7 @@ module dht11_controller (
                 dht11_io_control_next = 1'b0;
                 enable = 1;
                 if (us_tick) begin
-                    if (tick_cnt_reg >= 90) begin
+                    if (tick_cnt_reg >= 120) begin
                         dht11_io_control_next = 1'b1;
                         tick_cnt_next = 0;
                         n_state = IDLE;
@@ -179,12 +179,13 @@ module dht11_controller (
             CHECK_SUM: begin
                 enable = 1;
                 // if (us_tick) begin // 혹시 타이밍 안나오면 해보기
-                if(check_sum == humidity[7:0] + humidity[15:8] + temperature[7:0] + temperature[15:8])begin
+                if(check_sum == data_reg[39:32] + data_reg[31:24] + data_reg[23:16] + data_reg[15:8])begin
                     n_state = STOP;
                     valid_next = 1;
                 end else begin
                     n_state = IDLE;
                     valid_next = 0;
+                    data_next = 0;
                 end
                 // end
             end

@@ -6,6 +6,8 @@ module TOP_4MODULE (
     input rst,
 
     input rx,
+    input sw_dsiplay_mode,  //sw[0]
+    input sw_setting,       //sw[1]
 
     input btnR,
     input btnL,
@@ -16,14 +18,16 @@ module TOP_4MODULE (
     input sw_mode3,
     input sw_mode4,
 
-    input sw_setting_mode,
-
-    output [3:0] led,
+    // output [3:0] led,
 
     input  echo,
     output trig,
 
-    inout dht11_io
+    inout dht11_io,
+
+    output [3:0] fnd_com,
+    output [7:0] fnd_font,
+    output tx
 
 );
     parameter MSEC_BIT_WIDTH = 7;
@@ -43,8 +47,16 @@ module TOP_4MODULE (
     wire w_enable, w_enable_sr04, w_enable_dht11;
     assign w_enable = w_enable_dht11 | w_enable_sr04;
 
-    wire [1:0]w_setting_state;
+    wire [1:0] w_setting_state;
     wire w_b_tick;
+
+    wire [8:0] w_distance;
+    wire [7:0] w_humidity, w_temperature;
+
+    wire [7:0] w_msec;
+    wire [7:0] w_sec;
+    wire [7:0] w_min;
+    wire [7:0] w_hour;
 
 
     btn_debouce_block U_BTN_DEBOUNCE_BLOCK (
@@ -83,7 +95,8 @@ module TOP_4MODULE (
         .mode1(w_ascii_mode1),
         .mode2(w_ascii_mode2),
         .mode3(w_ascii_mode3),
-        .mode4(w_ascii_mode4)
+        .mode4(w_ascii_mode4),
+        .tx(tx)
     );
 
 
@@ -118,7 +131,7 @@ module TOP_4MODULE (
     );  //각 모듈로 연결할땐 버튼4개랑 & mode1 연산으로 넣기 + mode로 FND 셀렉
 
 
-    
+
     watch U_WATCH (
         .clk(clk),
         .rst(rst),
@@ -126,7 +139,7 @@ module TOP_4MODULE (
         .btnL(w_L & w_mode1),
         .btnU(w_U & w_mode1),
         .btnD(w_D & w_mode1),
-        .sw_setting_mode(sw_setting_mode& w_mode1), 
+        .sw_setting_mode(sw_setting & w_mode1),
         .msec(w_w_msec),
         .sec(w_w_sec),
         .min(w_w_min),
@@ -142,7 +155,7 @@ module TOP_4MODULE (
         .btnL(w_L & w_mode2),
         .btnU(w_U & w_mode2),
         .btnD(w_D & w_mode2),
-        .led (led[3]),
+        // .led (led[3]),
         .msec(w_stw_msec),
         .sec (w_stw_sec),
         .min (w_stw_min),
@@ -156,7 +169,6 @@ module TOP_4MODULE (
         .b_tick(w_b_tick)
     );
 
-    
 
     controll_unit_sr04 U_CONTROLL_SR04UNIT (
         .clk(clk),
@@ -166,7 +178,7 @@ module TOP_4MODULE (
         .b_tick(w_b_tick),
         .enable(w_enable_sr04),
         .trig(trig),
-        .distance()
+        .distance(w_distance)
     );
 
     dht11_controller U_DHT11_CONTROLLER (
@@ -175,17 +187,51 @@ module TOP_4MODULE (
         .dht11_start(w_R & w_mode4),
         .us_tick(w_b_tick),
         .enable(w_enable_dht11),
-        .valid(),
-        .humidity(),
-        .temperature(),
+        .valid(), //vlaid 어따씀;;
+        .humidity(w_humidity),
+        .temperature(w_temperature),
         .dht11_io(dht11_io)
     );
 
 
+    fnd_mode_mux U_FND_MODE_MUX (
+        .clk(clk),
+        .rst(rst),
+        .mode({w_mode1, w_mode2, w_mode3, w_mode4}),
+        .wtc_msec(w_w_msec),
+        .wtc_sec(w_w_sec),
+        .wtc_min(w_w_min),
+        .wtc_hour(w_w_hour),
+
+        .stw_msec(w_stw_msec),
+        .stw_sec (w_stw_sec),
+        .stw_min (w_stw_min),
+        .stw_hour(w_stw_hour),
+
+        .distance(w_distance),
+        .HM_TP({w_humidity, w_temperature}),
+
+        .msec(w_msec),
+        .sec (w_sec),
+        .min (w_min),
+        .hour(w_hour)
+    );
 
 
-
-
+    fnd_controller U_FND_CONTROLLER (
+        .clk(clk),
+        .rst(rst),
+        .sw_dsiplay_mode(sw_dsiplay_mode),
+        .msec(w_msec),
+        .sec(w_sec),
+        .min(w_min),
+        .hour(w_hour),
+        .setting_state(w_setting_state),
+        .setting(sw_setting),
+        .mode({w_mode1, w_mode2, w_mode3, w_mode4}),
+        .fnd_com(fnd_com),
+        .fnd_font(fnd_font)
+    );
 
 
 endmodule
