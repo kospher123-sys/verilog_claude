@@ -50,7 +50,7 @@ module SR04_sensor #(
 
     // Minimum Start-to-Start Period Timer
 
-    localparam integer PERIOD_CYCLES = MIN_PERIOD_US * CLOCKS_PER_US;
+    localparam integer PERIOD_CYCLES = MIN_PERIOD_US * CLOCKS_PER_US;  //6ms - 1 cycle period
 
     localparam integer PERIOD_WIDTH = (PERIOD_CYCLES <= 1) ? 1 : $clog2(
         PERIOD_CYCLES
@@ -61,7 +61,7 @@ module SR04_sensor #(
 
     wire start_accept;
 
-    assign start_accept =(c_state == IDLE) &&start &&!echo_sync &&period_ready_reg;
+    assign start_accept =(c_state == IDLE) &&start &&!echo_sync &&period_ready_reg; //idle state + start + ech0 == 0 + out of the cycle
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -70,7 +70,7 @@ module SR04_sensor #(
         end else if (start_accept) begin
             period_cnt_reg   <= 0;
             period_ready_reg <= 1'b0;
-        end else if (!period_ready_reg) begin
+        end else if (!period_ready_reg) begin   //measure the time with clk for 1cycle periode
             if (period_cnt_reg == PERIOD_CYCLES - 1) begin
                 period_ready_reg <= 1'b1;
             end else begin
@@ -121,32 +121,33 @@ module SR04_sensor #(
                     n_state = START;
                 end
             end
-            START: begin
+            START: begin    //output trigger signal
                 trigger = 1'b1;
                 enable  = 1'b1;
                 if (us_tick) begin
                     if (us_tick_cnt_reg == 11) begin
                         n_state = WAIT;
+                        trigger = 1'b0;
                         us_tick_cnt_next = 0;
                     end else begin
                         us_tick_cnt_next = us_tick_cnt_reg + 1;
                     end
                 end
             end
-            WAIT: begin
+            WAIT: begin     //wait a echo signal after send the trigger
                 clear = 1'b0;
                 enable = 1'b1;
 
-                echo_cm_next = 9'd0;
-                echo_rem_next = 6'd0;
+                echo_cm_next = 9'd0;    //58us마다 1씩 증가 하면 cm를 계산
+                echo_rem_next = 6'd0;   //58us를 계산
 
                 if (us_tick) begin
                     if (echo_sync) begin
                         echo_cm_next = 9'd0;
-                        echo_rem_next = 6'd1;
+                        echo_rem_next = 6'd1;   //echo상승이후 1us지난후 상태전이 되기 떄문에 1로 시작
                         us_tick_cnt_next = 1;
                         n_state = DISTANCE;
-                    end else if (us_tick_cnt_reg == TIMEOUT_TICKS - 1) begin
+                    end else if (us_tick_cnt_reg == TIMEOUT_TICKS - 1) begin    //타임아웃
                         us_tick_cnt_next = 0;
                         data_next = 0;
                         timeout_next = 1'b1;
@@ -160,15 +161,15 @@ module SR04_sensor #(
             DISTANCE: begin
                 enable = 1'b1;
 
-                if (!echo_sync) begin
+                if (!echo_sync) begin   //when echo ==0, move to STOP, sve echo_cm_reg to data_next
                     data_next = echo_cm_reg;
                     us_tick_cnt_next = 0;
                     n_state = STOP;
                 end else if (us_tick) begin
 
                     // Distance Counter
-                    if (echo_rem_reg == 6'd57) begin
-                        echo_rem_next = 6'd0;
+                    if (echo_rem_reg == 58 -1 ) begin
+                        echo_rem_next = 0;
                         echo_cm_next  = echo_cm_reg + 1'b1;
                     end else begin
                         echo_rem_next = echo_rem_reg + 1'b1;

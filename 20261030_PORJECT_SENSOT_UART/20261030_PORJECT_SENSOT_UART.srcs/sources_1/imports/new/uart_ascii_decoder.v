@@ -41,9 +41,6 @@
 //     );
 
 
-
-
-
 // endmodule
 
 module ascii_decoder (
@@ -65,7 +62,7 @@ module ascii_decoder (
 
 
 
-    reg [7:0] data_reg, data_next;
+    reg [7:0] data_reg, data_next;  //0~f 까지 처리 
     reg edge_run_stop_reg, edge_clear_reg, edge_mode_reg, edge_status_reg;
 
     assign run_stop = edge_run_stop_reg;
