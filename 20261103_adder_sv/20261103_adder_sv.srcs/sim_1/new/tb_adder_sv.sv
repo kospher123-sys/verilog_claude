@@ -159,7 +159,7 @@ class environment;
         mon = new(mon2scb_mbox, drv2mon_evt, ADDER_IF_v);
         scb = new(mon2scb_mbox);
     endfunction
-
+    //sequential 제어
     task run(int run_count);
         repeat (run_count) begin
             gen.run();
