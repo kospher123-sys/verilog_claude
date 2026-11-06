@@ -57,9 +57,8 @@ class driver;
     task run();
         forever begin
             tr = new();
-            @(posedge reg_vif.clk);
+            @(negedge reg_vif.clk);  //여기서 negede쓴게 중요
             gen2drv_mbox.get(tr);
-            #1;
             reg_vif.reset = 0;
             reg_vif.d = tr.d;
             tr.debug_ptint("DRV - AFTER POSEDGE");
