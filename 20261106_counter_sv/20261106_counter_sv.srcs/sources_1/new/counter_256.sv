@@ -25,5 +25,4 @@ module counter_256 (
     end
 
 
-
 endmodule

@@ -8,12 +8,23 @@ interface counter_interface (
     logic       run_stop;
     logic       clear;
     logic [7:0] counter;
+
+
+    property rst_zero;
+        @(posedge clk) rst |=> (counter == 8'd0);
+    endproperty
+    a_rst_zero :
+    assert property (rst_zero)
+    else begin
+        $display("[INTERFACE] rst = %d counter value error %d", rst, counter);
+    end
+
 endinterface
 
 class transaction;
     bit            rst;
     rand bit       mode;
-    rand bit       run_stop;
+    randc bit       run_stop;
     rand bit       clear;
     logic    [7:0] counter;
 
@@ -30,14 +41,26 @@ class transaction;
         };
     }
 
-    static int hold_cnt = 0;  // 남은 유지 클럭 수 (객체 간 공유)
+    static int hold_cnt = 0,hold_cnt_rs = 0;  // 남은 유지 클럭 수 (객체 간 공유)
 
     constraint mode_hold {(hold_cnt > 0) -> (mode == 1);}
+    constraint run_stop_hold {(hold_cnt_rs > 0) -> (run_stop == 1);}
 
     function void post_randomize();  // randomize() 직후 자동 호출
         if (hold_cnt > 0) hold_cnt--;
         else if (mode) hold_cnt = 2;  // 이번 1 + 이후 2번 = 3클럭
+        if (hold_cnt_rs > 0) hold_cnt_rs--;
+        else if (run_stop) hold_cnt_rs = 2; 
     endfunction
+
+    constraint clear_dist{
+        clear dist{
+             0:/9,
+             1:/1
+        };
+    }
+
+
 
 endclass
 
@@ -57,7 +80,8 @@ class generator;
 
         while (enable) begin
             tr = new;
-            tr.randomize();
+            assert (tr.randomize())
+            else $display("[GEN] tr.randomized error !!!!");
             tr.rst = 0;
             gen2drv_mbox.put(tr);
             tr.debug_ptint("GEN");
@@ -143,6 +167,15 @@ class scoreboad;
 
     logic [7:0] expected_count = 0;
     int pass_cnt = 0, fail_cnt = 0, total_cnt = 0;
+    int
+        clear_pass = 0,
+        clear_fail = 0,
+        mode0_pass = 0,
+        mode0_fail = 0,
+        mode1_pass = 0,
+        mode1_fail = 0,
+        stop_pass = 0,
+        stop_fail = 0;
     task run();
         forever begin
             tr = new;
@@ -150,39 +183,72 @@ class scoreboad;
 
             tr.debug_ptint("SCB");
 
-            if (!(tr.rst || tr.clear)) begin
-                total_cnt++;
-                $display("%t : ecpected_count = %d", $time, expected_count);
-                if (tr.run_stop) begin
-                    if (tr.mode) begin
-                        expected_count--;
-                    end else begin
+            total_cnt++;
+            if (!(tr.rst || tr.clear)) begin  // clear 아닐떄
+                if (tr.run_stop) begin  //동작중
+                    if (!tr.mode) begin  // ++ 덩작 
                         expected_count++;
+                        if (expected_count === tr.counter) begin  //pass판단 
+                            $display("%t : mode0 PASS", $time);
+                            mode0_pass++;
+                        end else begin
+                            $display("%t : mode0 fail", $time);
+                            mode0_fail++;
+                        end
+
+                    end else begin  //--동작
+                        expected_count--;
+                        if (expected_count === tr.counter) begin  //pass판단 
+                            $display("%t : mode1 PASS", $time);
+                            mode1_pass++;
+                        end else begin
+                            $display("%t : mode1 fail", $time);
+                            mode1_fail++;
+                        end
                     end
-                end else begin
+                end else begin  //동작 X
+                    if (expected_count === tr.counter) begin  //pass판단 
+                        $display("%t : stop PASS", $time);
+                        stop_pass++;
+                    end else begin
+                        $display("%t : stop fail", $time);
+                        stop_fail++;
+                    end
                     expected_count = expected_count;
                 end
-
-                if (expected_count === tr.counter) begin
-                    $display("%t : PASS", $time);
-                    pass_cnt++;
-                end else begin
-                    $display("%t : fail", $time);
-                    fail_cnt++;
-                end
-
-            end else begin
+            end else begin  // clear
                 expected_count = 0;
+                if (expected_count === tr.counter) begin  //pass판단 
+                    $display("%t : clear PASS", $time);
+                    clear_pass++;
+                end else begin
+                    $display("%t : clear fail", $time);
+                    clear_fail++;
+                end
             end
         end
     endtask
 
     task report();
+        pass_cnt = mode0_pass + mode1_pass + clear_pass + stop_pass;
+        fail_cnt = mode0_fail + mode1_fail + clear_fail + stop_fail;
         $display("***********************************");
         $display("***** counter 256 test progeam*****");
         $display("**       total test = %4d       **", total_cnt);
-        $display("**       pass  test = %4d       **", pass_cnt);
-        $display("**       fail  test = %4d       **", fail_cnt);
+        $display("**   mode0    pass  test = %4d  **", mode0_pass);
+        $display("**   mode0    fail  test = %4d  **", mode0_fail);
+        $display("***********************************");
+        $display("**   mode1    pass  test = %4d  **", mode1_pass);
+        $display("**   mode1    fail  test = %4d  **", mode1_fail);
+        $display("***********************************");
+        $display("**   clear    pass  test = %4d  **", clear_pass);
+        $display("**   clear    fail  test = %4d  **", clear_fail);
+        $display("***********************************");
+        $display("**   stop     pass  test = %4d  **", stop_pass);
+        $display("**   stop     fail  test = %4d  **", stop_fail);
+        $display("***********************************");
+        $display("**   total    pass  test = %4d  **", pass_cnt);
+        $display("**   total    fail  test = %4d  **", fail_cnt);
         $display("***********************************");
         $display("****** end counter 256 test *******");
         $display("***********************************");
