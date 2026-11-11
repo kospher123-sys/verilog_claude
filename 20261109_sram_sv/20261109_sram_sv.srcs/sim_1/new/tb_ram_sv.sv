@@ -23,6 +23,7 @@ endclass
 
 class generator;
     transaction tr;
+    transaction tr_scb;
     mailbox #(transaction) gen2drv_mbox;
     mailbox #(transaction) gen2scb_mbox;
     event gen_next_evt;
@@ -37,10 +38,17 @@ class generator;
     task run(int gen_cnt);
         repeat (gen_cnt) begin
             tr = new;
+            tr_scb = new;
             tr.randomize();
+            tr_scb.addr = tr.addr;
+            tr_scb.wdata = tr.wdata;
+            tr_scb.we = tr.we;
+            tr_scb.rdata = tr.rdata;
+
             gen2drv_mbox.put(tr);
-            gen2scb_mbox.put(tr);
+            gen2scb_mbox.put(tr_scb);
             tr.debug_print("GEN");
+            tr_scb.debug_print("GEN_scb");
             @(gen_next_evt);
         end
     endtask
@@ -63,9 +71,9 @@ class driver;
         forever begin
             @(negedge ram_vif.clk);
             gen2drv_mbox.get(tr);
-            ram_vif.addr  = tr.addr;
-            ram_vif.wdata = tr.wdata;
-            ram_vif.we    = tr.we;
+            ram_vif.addr  <= tr.addr;
+            ram_vif.wdata <= tr.wdata;
+            ram_vif.we    <= tr.we;
             tr.debug_print("DRV");
             ->>mon_next_evt;
         end
@@ -88,8 +96,7 @@ class monitor;
     task run();
         forever begin
             wait (mon_next_evt.triggered);
-            @(posedge ram_vif.clk);
-            #1;
+            @(negedge ram_vif.clk);
             tr       = new;
             tr.addr  = ram_vif.addr;
             tr.wdata = ram_vif.wdata;
@@ -122,15 +129,16 @@ class scorboad;
         write_fail = 0;
 
     logic [7:0] expected_buf[0:63];
+
     task run();
         forever begin
             mon2scb_mbox.get(tr_mon);
             gen2scb_mbox.get(tr_gen);
             total_cnt++;
-            if (tr_mon.we) begin
+            if (tr_gen.we) begin
                 // store for expected buffer
                 expected_buf[tr_gen.addr] = tr_gen.wdata;
-                if (tr_gen.wdata === tr_mon.rdata) begin
+                if (expected_buf[tr_gen.addr] === tr_mon.rdata) begin
                     $display("expected = %d", tr_gen.wdata);
                     $display("write_pass");
                     write_pass++;
