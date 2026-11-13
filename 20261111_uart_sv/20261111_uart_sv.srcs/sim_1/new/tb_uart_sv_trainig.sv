@@ -1,0 +1,285 @@
+`timescale 1ns / 1ps
+
+interface uart_interface (
+    input clk
+);
+    logic       rst;
+    logic       start;
+    logic [7:0] tx_data;
+    logic       tx_busy;
+    logic       tx;
+endinterface
+
+class transaction;
+    bit                     rst;
+    bit                     start;
+    rand logic        [7:0] tx_data;
+    rand int unsigned       interval;
+    logic                   tx_busy;
+    logic                   tx;
+    int                     start_bit_time;
+
+    constraint interval_range {interval < 10416;}
+
+    function void debug_print(string name);
+        $display(
+            "%t : [%s] rst = %d, start = %d, tx_data = %d,interval = %d, tx = %d, tx_busy = %d",
+            $time, name, rst, start, tx_data, interval, tx, tx_busy);
+    endfunction
+endclass
+
+class generator;
+    transaction tr;
+    mailbox #(transaction) gen2drv_mbox;
+    event gen_next_evt;
+
+    function new(mailbox#(transaction) gen2drv_mbox, event gen_next_evt);
+        this.gen2drv_mbox = gen2drv_mbox;
+        this.gen_next_evt = gen_next_evt;
+    endfunction
+
+    task run(int gen_cnt);
+        repeat (gen_cnt) begin
+
+            tr = new;
+            tr.randomize();
+            tr.rst   = 0;
+            tr.start = 0;
+            gen2drv_mbox.put(tr);
+            tr.debug_print("GEN");
+            @(gen_next_evt);
+
+        end
+    endtask
+
+endclass
+
+class driver;
+    transaction tr;
+    mailbox #(transaction) gen2drv_mbox;
+    virtual uart_interface uart_vif;
+
+    function new(mailbox#(transaction) gen2drv_mbox,
+                 virtual uart_interface uart_vif);
+        this.gen2drv_mbox = gen2drv_mbox;
+        this.uart_vif = uart_vif;
+    endfunction
+
+    int busy_check_count = 0;
+
+    task run();
+        forever begin
+            @(negedge uart_vif.clk);
+            busy_check_count = 0;
+            gen2drv_mbox.get(tr);
+            tr.debug_print("DRV");
+            //check tx_busy
+            while (uart_vif.tx_busy) begin  //dut는 전송이끝나고 바로 busy를 내리지 않고 1,2clk뒤에 내려 필요함
+                @(negedge uart_vif.clk);
+                busy_check_count++;
+                if (busy_check_count > 10416 * 10) begin
+                    $display("tx_busy high was too long........ !");
+                    break;
+                end
+            end
+            if (!uart_vif.tx_busy) begin
+                repeat (tr.interval) @(negedge uart_vif.clk);
+                uart_vif.rst     = 0;
+                uart_vif.start   = 1;
+                uart_vif.tx_data = tr.tx_data;
+                @(negedge uart_vif.clk);
+                uart_vif.start   = 0;
+                uart_vif.tx_data = 8'hxx;
+            end else begin
+
+            end
+        end
+    endtask
+
+    task preset();
+        uart_vif.rst     = 1;
+        uart_vif.start   = 0;
+        uart_vif.tx_data = 0;
+        @(negedge uart_vif.clk);
+        @(negedge uart_vif.clk);
+        uart_vif.rst = 0;
+    endtask
+
+endclass
+
+class monitor;
+    transaction tr_in, tr_out;
+    mailbox #(transaction) mon2scb_in_mbox;
+    mailbox #(transaction) mon2scb_out_mbox;
+    virtual uart_interface uart_vif;
+    parameter BAUD_TIME = 10416 * 10;  //10416 clock *10nsec
+
+    function new(mailbox#(transaction) mon2scb_in_mbox,
+                 mailbox#(transaction) mon2scb_out_mbox,
+                 virtual uart_interface uart_vif);
+        this.mon2scb_in_mbox = mon2scb_in_mbox;
+        this.mon2scb_out_mbox    = mon2scb_out_mbox;
+        this.uart_vif = uart_vif;
+    endfunction
+
+    task uart_receive(output logic [7:0] receive_data);
+        @(posedge uart_vif.clk);  //start 다음 상승에 start 비트 발생
+        #(BAUD_TIME / 2);  // baud의 가운데 지점
+        //check start bit
+        for (int i = 0; i < 8; i++) begin
+            #(BAUD_TIME);
+            receive_data[i] = uart_vif.tx;
+        end
+        #(BAUD_TIME);  //8번째 비트 -> stop 비트의 중간
+        //stop bit check
+        #(BAUD_TIME / 2);  // stop비트의 끝
+    endtask
+
+    task start_bit_time_check(output int start_bit_time);
+     @(posedge uart_vif.clk);
+     #1;
+        while (!uart_vif.tx & start_bit_time < BAUD_TIME/10) begin
+            @(posedge uart_vif.clk);
+            start_bit_time++;
+        end 
+    endtask
+
+    task run();
+        forever begin
+            //1. check start ==1
+            @(posedge uart_vif.clk);    //forever 시간지연 + 2,3 번에 값을 읽는 타이밍 맞춤
+            while (!uart_vif.start) begin  //start 틱신호가 0 일때 붙잡고있음 1이되면 아래로 넘어갑
+                @(posedge uart_vif.clk);
+            end
+            //2. mon2scb_in_mbox put
+            tr_in = new;
+            tr_in.tx_data = uart_vif.tx_data;
+            mon2scb_in_mbox.put(tr_in);
+            tr_in.debug_print("MON_in");
+
+            //3. baud_time*10 , mon2scb_out_mbox put
+            //receive task
+            tr_out = new;
+            fork
+            uart_receive(tr_out.tx_data);
+            start_bit_time_check(tr_out.start_bit_time);
+            join
+            tr_out.rst = uart_vif.rst;
+            tr_out.tx  = uart_vif.tx;
+            tr_out.debug_print("MON_out");
+            mon2scb_out_mbox.put(tr_out);
+        end
+
+    endtask
+
+endclass
+
+class scoreboad;
+    transaction tr_in, tr_out;
+    mailbox #(transaction) mon2scb_in_mbox;
+    mailbox #(transaction) mon2scb_out_mbox;
+    event gen_next_evt;
+
+    function new(mailbox#(transaction) mon2scb_in_mbox,
+                 mailbox#(transaction) mon2scb_out_mbox, event gen_next_evt);
+        this.mon2scb_in_mbox = mon2scb_in_mbox;
+        this.mon2scb_out_mbox = mon2scb_out_mbox;
+        this.gen_next_evt = gen_next_evt;
+    endfunction
+
+    int tx_data_pass = 0, tx_data_fail = 0;
+    int total_cnt;
+
+    task run();
+        forever begin
+            mon2scb_in_mbox.get(tr_in);
+            tr_in.debug_print("SCB_in");
+            mon2scb_out_mbox.get(tr_out);
+            tr_out.debug_print("SCB_out");
+
+            total_cnt++;
+            if (tr_in.tx_data == tr_out.tx_data) begin
+                tx_data_pass++;
+                $display(" tx_data Pass !!!");
+            end else begin
+                tx_data_fail++;
+                $display(" tx_data Fail !!!");
+            end
+            ->gen_next_evt;
+        end
+    endtask
+
+    task report();
+        $display("*****************************************");
+        $display("**      UART TX Verification Test      **");
+        $display("*****************************************");
+        $display("**         total count num = %4d       **", total_cnt);
+        $display("*****************************************");
+        $display("**        tx_data pass num = %4d       **", tx_data_pass);
+        $display("**        tx_data fail num = %4d       **", tx_data_fail);
+        $display("*****************************************");
+        $display("**    END UART TX Verification Test    **");
+        $display("*****************************************");
+
+    endtask
+
+endclass
+
+class enviroment;
+    generator              gen;
+    driver                 drv;
+    monitor                mon;
+    scoreboad              scb;
+
+    mailbox #(transaction) gen2drv_mbox;
+    mailbox #(transaction) mon2scb_in_mbox;
+    mailbox #(transaction) mon2scb_out_mbox;
+
+    event                  gen_next_evt;
+
+    function new(virtual uart_interface uart_vif);
+        gen2drv_mbox     = new;
+        mon2scb_in_mbox  = new;
+        mon2scb_out_mbox = new;
+        gen              = new(gen2drv_mbox, gen_next_evt);
+        drv              = new(gen2drv_mbox, uart_vif);
+        mon              = new(mon2scb_in_mbox, mon2scb_out_mbox, uart_vif);
+        scb              = new(mon2scb_in_mbox, mon2scb_out_mbox, gen_next_evt);
+    endfunction
+
+    task run(int gen_cnt);
+        drv.preset();
+        fork
+            gen.run(gen_cnt);
+            drv.run();
+            mon.run();
+            scb.run();
+        join_any
+        $display("end fork join");
+        scb.report();
+    endtask
+endclass
+
+module tb_uart_sv ();
+    parameter BAUD_TIME = (100_000_000 / 9600) * 10;
+    logic clk = 0;
+    uart_interface uart_if (clk);
+    enviroment env;
+
+    uart DUT (
+        .clk    (clk),
+        .rst    (uart_if.rst),
+        .start  (uart_if.start),
+        .tx_data(uart_if.tx_data),
+        .tx_busy(uart_if.tx_busy),
+        .tx     (uart_if.tx)
+    );
+
+    always #5 clk = ~clk;
+
+    initial begin
+        env = new(uart_if);
+        env.run(2);
+        $finish;
+    end
+endmodule
