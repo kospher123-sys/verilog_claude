@@ -41,12 +41,18 @@ module ascii_sender (
 
     assign ready = (state == IDLE);
 
+    // HC-SR04 측정 실패 플래그 (status_data[9]) → "distance : Err"
+    wire sr04_err = saved_data[9];
+
     // Skip leading zero digits, but preserve the last digit
+    // SR04 실패 시에는 숫자 대신 "Err"를 보내고 단위 "cm"(idx 14, 15)를 생략
     wire skip_digit =
-        (saved_mode == 3'd2 &&
+        (saved_mode == 3'd2 && !sr04_err &&
            ((idx == 6'd11 && bcd0[11:8] == 0) ||
             (idx == 6'd12 && bcd0[11:8] == 0 &&
              bcd0[7:4] == 0))) ||
+        (saved_mode == 3'd2 && sr04_err &&
+           (idx == 6'd14 || idx == 6'd15)) ||
         (saved_mode == 3'd3 &&
            ((idx == 6'd9 && bcd0[11:8] == 0) ||
             (idx == 6'd10 && bcd0[11:8] == 0 &&
@@ -294,7 +300,7 @@ module ascii_sender (
                         endcase
                     end
 
-                    // HC-SR04: distance : xxcm
+                    // HC-SR04: distance : xxcm  (실패 시 distance : Err)
                     3'd2: begin
                         case (idx)
                             0:  push_data = "d";
@@ -308,9 +314,9 @@ module ascii_sender (
                             8:  push_data = " ";
                             9:  push_data = ":";
                             10: push_data = " ";
-                            11: push_data = 8'h30 + bcd0[11:8];
-                            12: push_data = 8'h30 + bcd0[7:4];
-                            13: push_data = 8'h30 + bcd0[3:0];
+                            11: push_data = sr04_err ? "E" : 8'h30 + bcd0[11:8];
+                            12: push_data = sr04_err ? "r" : 8'h30 + bcd0[7:4];
+                            13: push_data = sr04_err ? "r" : 8'h30 + bcd0[3:0];
                             14: push_data = "c";
                             15: push_data = "m";
                             16: push_data = 8'h0D;

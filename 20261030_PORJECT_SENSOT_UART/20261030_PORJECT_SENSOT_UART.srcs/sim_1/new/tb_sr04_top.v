@@ -9,6 +9,10 @@
 //  TC6 echo 무응답 -> WAIT 36ms 타임아웃 -> distance 0
 //  TC7 물체 없음(echo 38ms) -> DISTANCE 36ms 타임아웃 -> distance 0
 //  TC8 echo가 high로 붙어 있으면 start 거부
+//  TC9  측정 범위 경계: 2cm / 400cm 정상, 1cm / 401cm 실패(error=1, distance=0)
+//  TC10 9비트 범위를 넘는 echo(30ms ≈ 517cm) → 실패(랩어라운드 없음)
+//  TC11 실패 직후 정상 측정 회복
+//  (2026-11-10 Design 2차: error 출력 검사, trigger 상승 엣지 횟수 검사 추가)
 module tb_sr04_top ();
 
     localparam IDLE = 3'd0, START = 3'd1, WAIT = 3'd2, DISTANCE = 3'd3, STOP = 3'd4;
@@ -17,10 +21,12 @@ module tb_sr04_top ();
     reg clk, rst, start, echo;
     wire trigger;
     wire [8:0] distance;
+    wire error;
     wire [2:0] debug_state;
 
     integer pass_cnt = 0, fail_cnt = 0;
     time t_trig_rise, trig_width;
+    integer trig_rise_cnt = 0;  // 측정 1회당 trigger 상승 엣지 수 (글리치 검출용)
 
     sr04_top #(
         .MIN_PERIOD_US(60_000)
@@ -31,13 +37,17 @@ module tb_sr04_top ();
         .echo(echo),
         .trigger(trigger),
         .distance(distance),
+        .error(error),
         .debug_state(debug_state)
     );
 
     always #5 clk = ~clk;  // 100MHz
 
     // trigger 폭 측정
-    always @(posedge trigger) t_trig_rise = $time;
+    always @(posedge trigger) begin
+        t_trig_rise = $time;
+        trig_rise_cnt = trig_rise_cnt + 1;
+    end
     always @(negedge trigger) trig_width = $time - t_trig_rise;
 
     task check(input [255:0] name, input [8:0] got, input [8:0] exp);
@@ -74,6 +84,7 @@ module tb_sr04_top ();
     // 측정 한 번: start -> echo -> STOP -> IDLE 까지 기다린 뒤 결과 확인
     task measure(input [255:0] name, input integer echo_us, input [8:0] exp_cm);
         begin
+            trig_rise_cnt = 0;
             press_start;
             sensor_echo(echo_us);
             wait (debug_state == IDLE);
@@ -100,6 +111,8 @@ module tb_sr04_top ();
         // TC2 10cm = 580us
         measure("TC2 10cm", 10 * 58, 10);
         check("TC2 trigger>=10us", (trig_width >= 10_000), 1);
+        check("TC2 trigger single pulse", trig_rise_cnt, 1);
+        check("TC2 error=0", error, 0);
         $display("       trigger width = %0t", trig_width);
 
         // TC3 100cm, 399cm
@@ -133,6 +146,7 @@ module tb_sr04_top ();
         wait (debug_state == WAIT);
         wait (debug_state == IDLE);
         check("TC6 no echo -> 0", distance, 0);
+        check("TC6 no echo -> error", error, 1);
 
         // TC7 물체 없음: echo 38ms high -> DISTANCE 36ms 타임아웃 -> 0
         wait_period;
@@ -145,6 +159,7 @@ module tb_sr04_top ();
                 wait (debug_state == DISTANCE);
                 wait (debug_state == IDLE);
                 check("TC7 echo 38ms -> 0", distance, 0);
+                check("TC7 echo 38ms -> error", error, 1);
             end
         join
 
@@ -157,7 +172,32 @@ module tb_sr04_top ();
         check("TC8 echo stuck high -> rejected", debug_state, IDLE);
         echo = 0;
 
+        // TC9 측정 범위 경계 (MIN_CM=2, MAX_CM=400)
+        wait_period;
+        measure("TC9 2cm", 2 * 58, 2);
+        check("TC9 2cm error=0", error, 0);
+        wait_period;
+        measure("TC9 400cm", 400 * 58, 400);
+        check("TC9 400cm error=0", error, 0);
+        wait_period;
+        measure("TC9 401cm -> 0", 401 * 58, 0);
+        check("TC9 401cm error=1", error, 1);
+        wait_period;
+        measure("TC9 1cm -> 0", 1 * 58, 0);
+        check("TC9 1cm error=1", error, 1);
+
+        // TC10 9비트(511cm)를 넘는 echo: 30ms ≈ 517cm → 랩어라운드 없이 실패
+        wait_period;
+        measure("TC10 30ms echo -> 0", 30_000, 0);
+        check("TC10 30ms echo error=1", error, 1);
+
+        // TC11 실패 직후 정상 측정 회복
+        wait_period;
+        measure("TC11 recover 10cm", 10 * 58, 10);
+        check("TC11 recover error=0", error, 0);
+
         $display("==== RESULT: PASS %0d / FAIL %0d ====", pass_cnt, fail_cnt);
+        $display("SUMMARY PASS=%0d FAIL=%0d", pass_cnt, fail_cnt);
         $finish;
     end
 

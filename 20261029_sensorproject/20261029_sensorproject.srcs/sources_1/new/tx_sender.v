@@ -9,9 +9,9 @@ module tx_sender #(
     input       clk,
     input       rst,
     // input       start,      // 1이면 주기 전송 동작
-    input       baud_tick,
-    input [3:0] w_msec_ds1,
-    input [3:0] w_msec_ds10,
+    input       baud_tick, //9600hz 틱신호
+    input [3:0] w_msec_ds1,//1의자리
+    input [3:0] w_msec_ds10,//10의자리
     input [3:0] w_sec_ds1,
     input [3:0] w_sec_ds10,
     input [3:0] w_min_ds1,

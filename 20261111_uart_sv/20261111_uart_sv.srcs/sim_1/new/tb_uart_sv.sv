@@ -23,7 +23,9 @@ class transaction;
     bit                     frame_time_error;
 
 
-    constraint interval_range {interval < 1042;}
+    constraint interval_range {
+        interval < 1000;
+        }
 
     function void debug_print(string name);
         $display(
@@ -87,7 +89,7 @@ class driver;
                 end
             end
             if (!uart_vif.tx_busy) begin
-                repeat (tr.interval) @(negedge uart_vif.clk);
+                repeat (tr.interval+1) @(negedge uart_vif.clk);
                 uart_vif.rst     = 0;
                 uart_vif.start   = 1;
                 uart_vif.tx_data = tr.tx_data;
@@ -198,16 +200,21 @@ class monitor;
 
     endtask
 
+    time start_interval=0, c_time_interval =0 ;
+    int interval_cnt =0;
+
     task run();
         forever begin
             //1. check start ==1
-            @(posedge uart_vif.clk);    //forever 시간지연 + 2,3 번에 값을 읽는 타이밍 맞춤
+            // @(posedge uart_vif.clk);    //forever 시간지연 + 2,3 번에 값을 읽는 타이밍 맞춤
             while (!uart_vif.start) begin  //start 틱신호가 0 일때 붙잡고있음 1이되면 아래로 넘어갑
                 @(posedge uart_vif.clk);
             end
+            c_time_interval = $time;
             //2. mon2scb_in_mbox put
             tr_in = new;
             tr_in.tx_data = uart_vif.tx_data;
+            tr_in.interval = (c_time_interval - start_interval)/10;
             mon2scb_in_mbox.put(tr_in);
             tr_in.debug_print("MON_in");
 
@@ -217,8 +224,9 @@ class monitor;
             uart_receive(tr_out.tx_data);
             tr_out.rst = uart_vif.rst;
             tr_out.tx  = uart_vif.tx;
-            tr_out.debug_print("MON_out");
+            start_interval = $time;
             mon2scb_out_mbox.put(tr_out);
+            tr_out.debug_print("MON_out");
         end
 
     endtask
@@ -231,11 +239,26 @@ class scoreboad;
     mailbox #(transaction) mon2scb_out_mbox;
     event gen_next_evt;
 
+    // coverage
+    covergroup cg_uart;
+        option.per_instance = 1;
+
+        cp_tx_data : coverpoint tr_in.tx_data{
+            bins coner[] = {8'haa, 8'h55};
+            bins data[] = {[0:255]};
+        }
+        cp_interval : coverpoint tr_in.interval{
+            bins interval_coner = {0};
+            bins interval_time [] = {[1:1041]};
+        }
+    endgroup
+
     function new(mailbox#(transaction) mon2scb_in_mbox,
                  mailbox#(transaction) mon2scb_out_mbox, event gen_next_evt);
         this.mon2scb_in_mbox = mon2scb_in_mbox;
         this.mon2scb_out_mbox = mon2scb_out_mbox;
         this.gen_next_evt = gen_next_evt;
+        this.cg_uart=new();
     endfunction
 
     int total_cnt;
@@ -243,8 +266,6 @@ class scoreboad;
     int tx_start_bit_pass = 0, tx_start_bit_fail = 0;
     int tx_stop_bit_pass = 0, tx_stop_bit_fail = 0;
     int tx_frame_time_bit_pass = 0, tx_frame_time_bit_fail = 0;
-
-    
 
 
     task run();
@@ -284,6 +305,7 @@ class scoreboad;
                 tx_frame_time_bit_fail++;
                 $display(" tx frmae time fail !!!");
             end
+            cg_uart.sample();
             ->gen_next_evt;
         end
     endtask
@@ -309,6 +331,11 @@ class scoreboad;
                  tx_frame_time_bit_pass);
         $display("**     frame time fail num = %4d      **",
                  tx_frame_time_bit_fail);
+        $display("*****************************************");
+        $display("**           UART TX Coveragr          **");
+        $display("*****************************************");
+        $display("**          tx_data   = %6.2f%%        **", cg_uart.cp_tx_data.get_coverage());
+        $display("**         interval   = %6.2f%%        **", cg_uart.cp_interval.get_coverage());
         $display("*****************************************");
         $display("**    END UART TX Verification Test    **");
         $display("*****************************************");
@@ -371,7 +398,7 @@ module tb_uart_sv ();
 
     initial begin
         env = new(uart_if);
-        env.run(10);
+        env.run(1000);
         $finish;
     end
 endmodule

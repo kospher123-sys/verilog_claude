@@ -467,6 +467,7 @@ module integrated_system_top (
     // ========================================
 
     wire [8:0] w_sr04_distance;
+    wire       w_sr04_error;
     wire [2:0] w_sr04_state;
 
     sr04_top #(
@@ -478,6 +479,7 @@ module integrated_system_top (
         .echo       (echo),
         .trigger    (trigger),
         .distance   (w_sr04_distance),
+        .error      (w_sr04_error),
         .debug_state(w_sr04_state)
     );
 
@@ -532,6 +534,7 @@ module integrated_system_top (
         .sw_display_mode(sw[4]),
 
         .distance(w_sr04_distance),
+        .sr04_error(w_sr04_error),
 
         .humidity(w_dht11_humidity),
         .temperature(w_dht11_temperature),
@@ -562,7 +565,8 @@ module integrated_system_top (
             end
 
             3'b010: begin
-                w_selected_status = {23'b0, w_sr04_distance};
+                // [9] = SR04 측정 실패, [8:0] = 거리(cm)
+                w_selected_status = {22'b0, w_sr04_error, w_sr04_distance};
             end
 
             3'b011: begin

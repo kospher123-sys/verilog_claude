@@ -1,0 +1,13 @@
+{
+    "files.watcherExclude": {
+        "**/*.sim/**": true,
+        "**/*.cache/**": true,
+        "**/*.runs/**": true,
+        "**/*.gen/**": true,
+        "**/xsim.dir/**": true
+    },
+    "files.exclude": {
+        "**/*.sim/**": true,
+        "**/xsim.dir/**": true
+    }
+}

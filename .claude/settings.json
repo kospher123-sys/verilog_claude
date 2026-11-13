@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(**/*.runs/**)",
+      "Read(**/*.cache/**)",
+      "Read(**/*.sim/**)",
+      "Read(**/*.hw/**)",
+      "Read(**/*.ip_user_files/**)",
+      "Read(**/.Xil/**)",
+      "Read(**/*.jou)",
+      "Read(**/*.log)",
+      "Read(**/*.str)",
+      "Read(**/*.dcp)",
+      "Read(**/*.bit)",
+      "Read(**/*.wdb)",
+      "Read(**/*.pb)",
+      "Read(**/*.zip)"
+    ]
+  }
+}

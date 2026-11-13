@@ -9,6 +9,7 @@ module sensor_fnd_controller (
     input sw_display_mode,
 
     input [8:0] distance,
+    input sr04_error,      // SR04 측정 실패 → "Err " 표시
     input [15:0] humidity,
     input [15:0] temperature,
     input dht_valid,
@@ -35,9 +36,14 @@ module sensor_fnd_controller (
 
         case (sw_mode)
             3'b010: begin
-                // HC-SR04: d + 3-digit distance
-                display_value = distance;
-                prefix_font = 8'hA1;  // d
+                // HC-SR04: d + 3-digit distance, 측정 실패 시 "Err "
+                if (sr04_error) begin
+                    show_error = 1'b1;
+                end
+                else begin
+                    display_value = distance;
+                    prefix_font = 8'hA1;  // d
+                end
             end
 
             3'b011: begin
@@ -175,7 +181,7 @@ module sensor_fnd_controller (
                 fnd_font = 8'hBF;  // '-'
             end
 
-            // DHT11: communication error
+            // DHT11 통신 오류 / SR04 측정 실패
             else if (show_error) begin
                 case (digit_sel_reg)
                     2'b00: fnd_font = 8'hFF; // blank

@@ -10,6 +10,7 @@ module sr04_top #(
     input echo,
     output trigger,
     output [8:0] distance,
+    output error,          // 마지막 측정 실패(무응답/범위 밖) = 1
     output [2:0] debug_state
 );
 
@@ -32,6 +33,7 @@ module sr04_top #(
         .enable(w_enable),
         .clear(w_clear),
         .distance(distance),
+        .error(error),
         .debug_state(debug_state)
     );
 

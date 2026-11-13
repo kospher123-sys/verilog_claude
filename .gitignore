@@ -1,0 +1,24 @@
+# Vivado 자동 생성 폴더 (.xpr을 열고 다시 합성/시뮬하면 재생성됨)
+*.runs/
+*.cache/
+*.sim/
+*.hw/
+*.ip_user_files/
+*.gen/
+.Xil/
+xsim.dir/
+
+# Vivado 로그/저널/중간 산출물
+*.jou
+*.log
+*.str
+*.pb
+*.dcp
+*.wdb
+*.bit
+*.backup.*
+webtalk*
+usage_statistics_webtalk.*
+
+# 압축 백업
+*.zip
