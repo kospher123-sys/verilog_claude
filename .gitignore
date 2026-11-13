@@ -22,3 +22,9 @@ usage_statistics_webtalk.*
 
 # 압축 백업
 *.zip
+
+# 발표자료 / 에디터·AI 설정 파일
+*.pptx
+.claude/
+.vscode/
+CLAUDE.md
